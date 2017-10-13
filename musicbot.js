@@ -30,6 +30,7 @@ var inform_np = true;
 var now_playing_data = {};
 var queue = [];
 var aliases = {};
+var volume = 5;
 
 var voice_connection = null;
 var voice_handler = null;
@@ -337,7 +338,27 @@ var commands = [
 				console.log('Error on setavatar command:', err); 
       });
 		}
-  }
+  },
+  {
+    command: "volume",
+        description: "Set volume, 1 - 100",
+        parameters: ["Number between 1 - 100"],
+        execute: function(message, params) {
+            var volume_user = params[1];
+            var reg = /^\d*$/;
+            if (volume_user < 1 || volume_user > 100 || !reg.test(volume_user)) {
+                message.reply('Volume number incorrect');
+            } else {
+                volume_user = volume_user / 100;
+                if (voice_handler === null) {
+                    volume = volume_user;
+                } else {
+                    voice_handler.setVolume(volume_user);
+                }
+                message.reply('Volume is changed to ' + params[1]);
+            }
+        }
+    }
 
 ];
 
@@ -352,7 +373,7 @@ bot.on("disconnect", event => {
 bot.on("message", message => {
 	if(message.channel.type === "dm" && message.author.id !== bot.user.id) { //Message received by DM
 		//Check that the DM was not send by the bot to prevent infinite looping
-		message.channel.sendMessage(dm_text);
+		message.channel.send(dm_text);
 	} else if(message.channel.type === "text" && message.channel.name === text_channel.name) { //Message received on desired text channel
 		if(message.isMentioned(bot.user)) {
 			message.reply(mention_text);
@@ -395,7 +416,7 @@ function add_to_queue(video, message, mute = false) {
 
 function play_next_song() {
 	if(is_queue_empty()) {
-		text_channel.sendMessage("The queue is empty!");
+		text_channel.send("The queue is empty!");
 	}
 
 	var video_id = queue[0]["id"];
@@ -406,12 +427,12 @@ function play_next_song() {
 	now_playing_data["user"] = user;
 
 	if(inform_np) {
-		text_channel.sendMessage('Now playing: "' + title + '" (requested by ' + user + ')');
+		text_channel.send('Now playing: "' + title + '" (requested by ' + user + ')');
 		bot.user.setGame(title);
 	}
 
 	var audio_stream = ytdl("https://www.youtube.com/watch?v=" + video_id);
-	voice_handler = voice_connection.playStream(audio_stream);
+	voice_handler = voice_connection.playStream(audio_stream, {volume: volume});
 
 	voice_handler.once("end", reason => {
 		voice_handler = null;
